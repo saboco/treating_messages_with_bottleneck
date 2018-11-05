@@ -1,0 +1,13 @@
+storage: none
+source https://api.nuget.org/v3/index.json
+
+nuget Microsoft.AspNetCore.Hosting
+nuget Microsoft.AspNetCore.Diagnostics
+nuget Microsoft.AspNetCore.Server.Kestrel
+nuget Microsoft.Extensions.Configuration.Json
+nuget Microsoft.Extensions.Logging.Console
+nuget Microsoft.Extensions.Logging.Debug
+nuget Microsoft.Extensions.DependencyInjection
+nuget Fsharp.Core
+
+nuget Giraffe

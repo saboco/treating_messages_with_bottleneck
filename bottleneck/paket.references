@@ -1,0 +1,9 @@
+Microsoft.AspNetCore.Hosting
+Microsoft.AspNetCore.Diagnostics
+Microsoft.AspNetCore.Server.Kestrel
+Microsoft.Extensions.Configuration.Json
+Microsoft.Extensions.Logging.Console
+Microsoft.Extensions.Logging.Debug
+Microsoft.Extensions.DependencyInjection
+Fsharp.Core
+Giraffe
