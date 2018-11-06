@@ -2,4 +2,5 @@
 
 [<CLIMutable>]
 type Message = {
-    Text : string }
+    Id : int
+    Body : string }

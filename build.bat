@@ -3,4 +3,6 @@ IF NOT EXIST paket.lock (
 )
 dotnet restore bottleneck/
 dotnet build bottleneck/
+dotnet restore dispatcher/
+dotnet build dispatcher/
 

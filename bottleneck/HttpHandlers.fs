@@ -13,10 +13,10 @@ module HttpHandlers =
             task {
                 // 'let!' is like await a Task<T> and the result T is put into 'body' T is string here
                 // var body = await ctx.ReadBodyFromRequestAsyn();
-                let! body = ctx.ReadBodyFromRequestAsync()
+                let! message = ctx.BindJsonAsync<Message>()
                 do! Task.Delay(1000); // do! is like await for a Task on c#
-                let response = {
-                    Text = sprintf "%s and some info more" body
-                }
+                let response = { 
+                    message with
+                        Body = sprintf "%s and some info more" message.Body }
                 return! json response next ctx
             }
