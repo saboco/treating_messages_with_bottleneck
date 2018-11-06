@@ -1,3 +1,4 @@
 Microsoft.AspNetCore.App
 Newtonsoft.Json
 Giraffe
+FSharp.Core

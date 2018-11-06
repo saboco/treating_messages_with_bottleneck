@@ -48,13 +48,15 @@ let configureLogging (builder : ILoggingBuilder) =
     let filter (l : LogLevel) = l.Equals LogLevel.Trace
     builder.AddFilter(filter).AddConsole().AddDebug() |> ignore
 
-[<EntryPoint>]
-let main _ =
-    WebHostBuilder()
+let host = 
+     WebHostBuilder()
         .UseKestrel()
         .Configure(Action<IApplicationBuilder> configureApp)
         .ConfigureServices(configureServices)
         .ConfigureLogging(configureLogging)
         .Build()
-        .Run()
+
+[<EntryPoint>]
+let main _ =
+    host.Run()
     0

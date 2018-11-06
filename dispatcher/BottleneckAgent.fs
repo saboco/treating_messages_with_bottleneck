@@ -6,7 +6,7 @@ open System.Net.Http
 open Newtonsoft.Json
 open System.Diagnostics
 
-let createAgent postMessage () =
+let createAgent (url : System.Uri) postMessage () =
     MailboxProcessor.Start(fun inbox ->
         async {
             while true do
@@ -14,7 +14,7 @@ let createAgent postMessage () =
                 Debug.WriteLine(sprintf "Bottleneck: %A" message)
                 use client = new HttpClient()
                 let content = new StringContent(JsonConvert.SerializeObject message)
-                let! res = client.PostAsync("http://localhost:50552/api/cassandra", content) |> Async.AwaitTask
+                let! res = client.PostAsync(url, content) |> Async.AwaitTask
                 let! body = res.Content.ReadAsStringAsync() |> Async.AwaitTask
                 
                 // post message to next step

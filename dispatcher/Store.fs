@@ -10,7 +10,8 @@ open System.Diagnostics
 let createAgent postMessage =
     let storePath =
         let here = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
-        Path.Combine(here, "messages")
+        let storeId = System.Guid.NewGuid()
+        Path.Combine(here, sprintf "messages/%O" storeId)
     let getFullPath file =
         Path.Combine(storePath, file)
     let ensureStore () =

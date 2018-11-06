@@ -5,4 +5,6 @@ dotnet restore bottleneck/
 dotnet build bottleneck/
 dotnet restore dispatcher/
 dotnet build dispatcher/
+dotnet restore runner/
+dotnet build runner/
 
