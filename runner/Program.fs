@@ -29,13 +29,15 @@ let setupDispatcher url messagesToTreat numberOfAgents endsApp =
     let fetchMessages = RawMessages.fetchMessagesAgent removerAgent.Post getBottleneckAgent
     stopAgents, fetchMessages messagesToTreat
 
+[<RPlotExporter; RankColumn>]
+[<IterationCount(10)>]
 type BottleneckBenchMark () =
     let mutable ends = false
     let oneloopMore () = not ends
     let rec loop () =
         if oneloopMore ()
         then
-            printf "" // weirg but without this the loop does not end
+            printf "" // weird but without this the loop does not end
             loop ()
 
     let endsApp () = ends <- true
@@ -55,10 +57,10 @@ type BottleneckBenchMark () =
     let runStopAgents () = !stopAgents () Fetched.Stop |> Async.RunSynchronously
 
 
-    [<Params(1,8,32,64,128,512,1024)>]
+    [<Params(8,32,64,128,512,1024)>]
     member val public NumberOfAgents = 0 with get,set
 
-    [<Params(3000)>]
+    [<Params(10000)>]
     member val public MessagesToTreat = 0 with get, set
 
     [<IterationSetup>]
