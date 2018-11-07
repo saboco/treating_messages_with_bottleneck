@@ -19,9 +19,9 @@ let createAgent (url : System.Uri) postMessage () =
                         let! body = res.Content.ReadAsStringAsync() |> Async.AwaitTask
 
                         // post message to next step
-                        JsonConvert.DeserializeObject<Message> body
-                        |> Hydratated
-                        |> postMessage
+                        JsonConvert.DeserializeObject<Message list> body
+                        |> List.map (fun message -> message |> Hydratated |> postMessage)
+                        |> ignore
 
                         return! loop()
 

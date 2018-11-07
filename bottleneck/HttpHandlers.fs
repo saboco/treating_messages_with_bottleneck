@@ -11,14 +11,49 @@ module HttpHandlers =
     let handleMessage =
         fun (next : HttpFunc) (ctx : HttpContext) ->
             task {
-                // 'let!' is like await a Task<T> and the result T is put into 'body'
-                // var body = await ctx.BindJsonAsync<Message>()
-                let! message = ctx.BindJsonAsync<Message>()
-                // do! is like await for a Task on c#
-                // await Task.Delay(1000);
-                do! Task.Delay(1000)
-                let response = {
-                    message with
-                        Body = sprintf "%s and some info more" message.Body }
+                let hydratedMessage message =
+                    {   message with
+                            Body = sprintf "%s and some info more" message.Body }
+
+                let! messages = ctx.BindJsonAsync<Message list>()
+                do! Task.Delay(100) // adding more treatment time
+                let response = List.map hydratedMessage messages
+                return! json response next ctx
+            }
+
+    open MessagesStore
+
+    let messagesStore = MessagesStore ()
+
+    let giveMessages (batchSize,total) =
+        fun (next : HttpFunc) (ctx : HttpContext) ->
+            task {
+                let messages = messagesStore.GetMessages batchSize total
+                return! json messages next ctx
+            }
+
+    let messageTreated =
+        fun (next : HttpFunc) (ctx : HttpContext) ->
+            task {
+                let! ids = ctx.BindJsonAsync<int list>()
+                messagesStore.MessageTreated ids
+                let response = sprintf "Messages %A marked as treated" ids
+                return! json response next ctx
+            }
+
+    let getMessagesInfo =
+        fun (next : HttpFunc) (ctx : HttpContext) ->
+            task {
+                let treated = messagesStore.TreatedMessages ()
+                let out = messagesStore.MessagesOut ()
+                let response = sprintf "%i has been treated. %i messages still out" treated out
+                return! json response next ctx
+            }
+
+    let resetMessages =
+        fun (next : HttpFunc) (ctx : HttpContext) ->
+            task {
+                messagesStore.Reset ()
+                let response = sprintf "messages store cleared"
                 return! json response next ctx
             }

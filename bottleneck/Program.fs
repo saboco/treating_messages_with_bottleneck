@@ -16,8 +16,16 @@ let webApp =
     choose [
         subRoute "/api"
             (choose [
+                GET >=> choose [
+                    routef "/messages/batch/%i/total/%i" giveMessages
+                    route "/messages/info" >=> getMessagesInfo
+                ]
                 POST >=> choose [
-                    route "/cassandra" >=> handleMessage
+                    route "/bottleneck" >=> handleMessage
+                    route "/messages/treated" >=> messageTreated
+                ]
+                DELETE >=> choose [
+                    route "/messages" >=> resetMessages
                 ]
             ])
         setStatusCode 404 >=> text "Not Found" ]
@@ -48,7 +56,7 @@ let configureLogging (builder : ILoggingBuilder) =
     let filter (l : LogLevel) = l.Equals LogLevel.Trace
     builder.AddFilter(filter).AddConsole().AddDebug() |> ignore
 
-let host = 
+let host =
      WebHostBuilder()
         .UseKestrel()
         .Configure(Action<IApplicationBuilder> configureApp)

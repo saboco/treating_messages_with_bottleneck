@@ -2,11 +2,8 @@
 module RawMessages
 open Models
 open System
-
-let private nextMessage n : seq<RawMessage> = seq {
-    for i in 1 .. n do
-        yield { Id = i; Body = sprintf "Message %i" i }
-}
+open Newtonsoft.Json
+open System.Net.Http
 
 let private hasToBeTreated (message : RawMessage) =
     //let r = Random()
@@ -14,19 +11,35 @@ let private hasToBeTreated (message : RawMessage) =
     //message.Id % n = 0 // filter logic
     true
 
-let fetchMessagesAgent removeMsg getAgent n =
-    async {
-    let nextMessage = nextMessage n
-    let enumerator = nextMessage.GetEnumerator()
-    while enumerator.MoveNext() do
-        let message = enumerator.Current
-        if hasToBeTreated message  then
-            let! (Agent agent) = getAgent ()
-            message
-            |> Fetched
-            |> agent.Post
-        else
-            message.Id
-            |> Remove
-            |> removeMsg
-    }
+let fetchMessagesAgent (url : Uri) removeMsg getAgent numberOfMessages batchSize numberOfAgents =
+    let rec fetchMessages =
+        let rec loop () =
+            async {
+                let url = Url.createUri url (sprintf "/batch/%i/total/%i" batchSize numberOfMessages)
+                use client = new HttpClient()
+                let! res = client.GetAsync(url) |> Async.AwaitTask
+                let! body = res.Content.ReadAsStringAsync() |> Async.AwaitTask
+
+                let messages = JsonConvert.DeserializeObject<RawMessage list> body
+                let! (Agent agent) = getAgent ()
+
+                messages
+                |> List.filter hasToBeTreated
+                |> Fetched
+                |> agent.Post
+
+                messages
+                |> List.filter (hasToBeTreated >> not)
+                |> List.map (fun message -> Remove message.Id)
+                |> List.map removeMsg
+                |> ignore
+
+                if messages.Length > 0
+                then return! loop ()
+                else return ()
+            }
+        loop ()
+
+    let agents = [for _ in 1 .. numberOfAgents do yield fetchMessages]
+
+    agents

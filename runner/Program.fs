@@ -3,9 +3,19 @@ open Models
 
 open BenchmarkDotNet.Attributes
 open BenchmarkDotNet.Running
+open System.Net.Http
 
+let clearMessagesStore () =
+    async {
+        use client = new HttpClient()
+        let! res =client.DeleteAsync(Uri("http://localhost:5000/api/messages")) |> Async.AwaitTask
+        let! body= res.Content.ReadAsStringAsync() |> Async.AwaitTask
+        printfn "%s" body
+        return ()
+    }
+    
 
-let setupDispatcher url messagesToTreat numberOfAgents endsApp =
+let setupDispatcher bottleneckUrl messagesUrl messagesToTreat numberOfBottleneckAgents batchSize numberOfFetchAgents endsApp =
     let dummyPostMsg () : unit = failwith "unfixed reference"
 
     let stopStoreAgent = ref dummyPostMsg
@@ -14,11 +24,11 @@ let setupDispatcher url messagesToTreat numberOfAgents endsApp =
     let runStopStoreAgent () = !stopStoreAgent ()
     let runStopZipperAgent () = !stopZipperAgent ()
 
-    let (Agent removerAgent) = Remover.createAgent runStopStoreAgent runStopZipperAgent endsApp messagesToTreat
+    let (Agent removerAgent) = Remover.createAgent messagesUrl runStopStoreAgent runStopZipperAgent endsApp messagesToTreat batchSize
     let (Agent storeAgent) = Store.createAgent removerAgent.Post
     let (Agent zipperAgent) = Zipper.createAgent storeAgent.Post
-    let createBottleneckAgent =  Bottleneck.createAgent url zipperAgent.Post
-    let getBottleneckAgent,stopAgents = AgentsPool.createAgentSelector (numberOfAgents, createBottleneckAgent)
+    let createBottleneckAgent =  Bottleneck.createAgent bottleneckUrl zipperAgent.Post
+    let getBottleneckAgent,stopAgents = AgentsPool.createAgentSelector (numberOfBottleneckAgents, createBottleneckAgent)
 
     let postStopStoreAgent () = storeAgent.Post Zipped.Stop
     let postStopZipperAgent () = zipperAgent.Post Hydratated.Stop
@@ -26,10 +36,25 @@ let setupDispatcher url messagesToTreat numberOfAgents endsApp =
     stopStoreAgent := postStopStoreAgent
     stopZipperAgent := postStopZipperAgent
 
-    let fetchMessages = RawMessages.fetchMessagesAgent removerAgent.Post getBottleneckAgent
-    stopAgents, fetchMessages messagesToTreat
+    let fetchMessages = RawMessages.fetchMessagesAgent messagesUrl removerAgent.Post getBottleneckAgent
+    stopAgents, fetchMessages messagesToTreat batchSize numberOfFetchAgents
 
-[<RPlotExporter; RankColumn>]
+let testApp () =
+    let mutable ends = false
+    let endsApp () = ends <- true
+    let bottleneckUrl = Uri "http://localhost:5000/api/bottleneck"
+    let messagesUrl = Uri "http://localhost:5000/api/messages"
+    let (stopagents, fetchMessages) =
+        setupDispatcher bottleneckUrl messagesUrl 10000 8 1000 1 endsApp
+    fetchMessages |> List.map Async.RunSynchronously |> ignore
+    let rec loop () =
+        if not ends
+        then loop ()
+
+    loop ()
+    stopagents Fetched.Stop |> Async.RunSynchronously
+
+[<RankColumn>]
 [<IterationCount(10)>]
 type BottleneckBenchMark () =
     let mutable ends = false
@@ -43,7 +68,7 @@ type BottleneckBenchMark () =
     let endsApp () = ends <- true
 
     let dummyApp =
-        let innerFn () :  Async<unit> = failwith "dummyApp unfixed"
+        let innerFn () :  List<Async<unit>> = failwith "dummyApp unfixed"
         innerFn
 
     let dummyStopAgents =
@@ -53,12 +78,17 @@ type BottleneckBenchMark () =
     let app = ref dummyApp
     let stopAgents = ref dummyStopAgents
 
-    let runApp () = !app () |> Async.RunSynchronously
+    let runApp () = !app () |> List.map Async.RunSynchronously |> ignore
     let runStopAgents () = !stopAgents () Fetched.Stop |> Async.RunSynchronously
 
+    [<Params(128,512,1024)>]
+    member val public NumberOfBottleneckAgents = 0 with get,set
 
-    [<Params(8,32,64,128,512,1024)>]
-    member val public NumberOfAgents = 0 with get,set
+    [<Params(1,8,128)>]
+    member val public NumberOfFetchAgents = 0 with get,set
+
+    [<Params(1000)>]
+    member val public BatchSize = 0 with get,set
 
     [<Params(10000)>]
     member val public MessagesToTreat = 0 with get, set
@@ -66,8 +96,9 @@ type BottleneckBenchMark () =
     [<IterationSetup>]
     member this.Setup () =
         printfn "********************************************* IterationSetup"
-        let url =(Uri "http://localhost:5000/api/cassandra")
-        let (a, b) = setupDispatcher url this.MessagesToTreat this.NumberOfAgents endsApp
+        let bottleneckUrl = Uri "http://localhost:5000/api/bottleneck"
+        let messagesUrl = Uri "http://localhost:5000/api/messages"
+        let (a, b) = setupDispatcher bottleneckUrl messagesUrl this.MessagesToTreat this.NumberOfBottleneckAgents this.BatchSize this.NumberOfFetchAgents endsApp
         app := (fun () -> b)
         stopAgents := (fun () -> a)
         ends <- false
@@ -76,6 +107,7 @@ type BottleneckBenchMark () =
     member __.Clean () =
         printfn "********************************************* IterationCleanApp"
         runStopAgents ()
+        clearMessagesStore () |> Async.RunSynchronously
 
     [<Benchmark>]
     member __.App () =
@@ -83,7 +115,6 @@ type BottleneckBenchMark () =
         runApp ()
         loop ()
         printfn "********************************************* endingApp"
-
 
 [<EntryPoint>]
 let main argv =

@@ -17,7 +17,7 @@ type ZippedMessage =  {
 }
 
 type Fetched =
-    | Fetched of RawMessage
+    | Fetched of RawMessage list
     | Stop
 
 type Hydratated =
