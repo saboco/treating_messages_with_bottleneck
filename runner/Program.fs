@@ -1,56 +1,87 @@
-﻿// Learn more about F# at http://fsharp.org
-
-open System
+﻿open System
 open Models
-open Microsoft.AspNetCore.Hosting
 
 open BenchmarkDotNet.Attributes
-open System.Threading.Tasks
 open BenchmarkDotNet.Running
 
 
-let runDispatcher url messagesToTreat numberOfAgents =
-    let (Agent removerAgent) = Remover.createAgent ()
+let setupDispatcher url messagesToTreat numberOfAgents endsApp =
+    let dummyPostMsg () : unit = failwith "unfixed reference"
+
+    let stopStoreAgent = ref dummyPostMsg
+    let stopZipperAgent = ref dummyPostMsg
+
+    let runStopStoreAgent () = !stopStoreAgent ()
+    let runStopZipperAgent () = !stopZipperAgent ()
+
+    let (Agent removerAgent) = Remover.createAgent runStopStoreAgent runStopZipperAgent endsApp messagesToTreat
     let (Agent storeAgent) = Store.createAgent removerAgent.Post
     let (Agent zipperAgent) = Zipper.createAgent storeAgent.Post
     let createBottleneckAgent =  Bottleneck.createAgent url zipperAgent.Post
-    let getBottleneckAgent = AgentsPool.createAgentSelector (numberOfAgents, createBottleneckAgent)
+    let getBottleneckAgent,stopAgents = AgentsPool.createAgentSelector (numberOfAgents, createBottleneckAgent)
+
+    let postStopStoreAgent () = storeAgent.Post Zipped.Stop
+    let postStopZipperAgent () = zipperAgent.Post Hydratated.Stop
+
+    stopStoreAgent := postStopStoreAgent
+    stopZipperAgent := postStopZipperAgent
 
     let fetchMessages = RawMessages.fetchMessagesAgent removerAgent.Post getBottleneckAgent
-    let n = messagesToTreat
-    let task =fetchMessages n |> Async.StartAsTask
-    task.Wait()
-
-let runBottleneck () = bottleneck.App.host.RunAsync()
-let runApp numberOfMessages numberOfAgents =
-    runDispatcher (Uri "http://localhost:5000/api/cassandra") numberOfMessages numberOfAgents
-
+    stopAgents, fetchMessages messagesToTreat
 
 type BottleneckBenchMark () =
+    let mutable ends = false
+    let oneloopMore () = not ends
+    let rec loop () =
+        if oneloopMore ()
+        then
+            printf "" // weirg but without this the loop does not end
+            loop ()
+
+    let endsApp () = ends <- true
+
+    let dummyApp =
+        let innerFn () :  Async<unit> = failwith "dummyApp unfixed"
+        innerFn
+
+    let dummyStopAgents =
+        let innerFn () : AgentsPool.StopAgentFunc<Fetched> = failwith "dummyStopAgents unfixed"
+        innerFn
+
+    let app = ref dummyApp
+    let stopAgents = ref dummyStopAgents
+
+    let runApp () = !app () |> Async.RunSynchronously
+    let runStopAgents () = !stopAgents () Fetched.Stop |> Async.RunSynchronously
+
 
     [<Params(1,8,32,64,128,512,1024)>]
-    //[<Params(512)>]
     member val public NumberOfAgents = 0 with get,set
 
     [<Params(3000)>]
     member val public MessagesToTreat = 0 with get, set
 
-    [<GlobalSetup>]
-    member __.SetupData () =
-        let _ = runBottleneck () |> Async.AwaitTask |> Async.StartAsTask
-        Task.Delay(2000) |> Async.AwaitTask |> Async.RunSynchronously // waiting so the server starts
+    [<IterationSetup>]
+    member this.Setup () =
+        printfn "********************************************* IterationSetup"
+        let url =(Uri "http://localhost:5000/api/cassandra")
+        let (a, b) = setupDispatcher url this.MessagesToTreat this.NumberOfAgents endsApp
+        app := (fun () -> b)
+        stopAgents := (fun () -> a)
+        ends <- false
 
+    [<IterationCleanup>]
+    member __.Clean () =
+        printfn "********************************************* IterationCleanApp"
+        runStopAgents ()
 
     [<Benchmark>]
-    member this.App () =
-        runApp this.MessagesToTreat this.NumberOfAgents
+    member __.App () =
+        printfn "********************************************* runningApp"
+        runApp ()
+        loop ()
+        printfn "********************************************* endingApp"
 
-        let rec waitUntilAllMessagesHasBeenTreated ()  =
-            let count = Remover.getCount ()
-            if count >= this.MessagesToTreat
-            then count
-            else waitUntilAllMessagesHasBeenTreated ()
-        waitUntilAllMessagesHasBeenTreated()
 
 [<EntryPoint>]
 let main argv =
@@ -61,4 +92,5 @@ let main argv =
         |]
 
     switch.Run argv |> ignore
+
     0

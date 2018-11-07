@@ -4,8 +4,6 @@ module Store
 open System.IO
 open Models
 open Newtonsoft.Json
-open System.Diagnostics
-
 
 let createAgent postMessage =
     let storePath =
@@ -20,14 +18,20 @@ let createAgent postMessage =
     ensureStore ()
     MailboxProcessor.Start(fun inbox ->
         async {
-            while true do
-                let! (Zipped zippedMessage) = inbox.Receive()
-                Debug.WriteLine(sprintf "Store: %A" zippedMessage)
-                let path = (sprintf "message%i" zippedMessage.Id) |> getFullPath
-                do! File.AppendAllTextAsync(path, JsonConvert.SerializeObject zippedMessage) |> Async.AwaitTask
-                
-                zippedMessage.Id
-                |> Remove
-                |> postMessage
+            let rec loop () =
+                async {
+                    let! msg = inbox.Receive()
+                    match msg with
+                    | Zipped zippedMessage ->
+                        let path = (sprintf "message%i" zippedMessage.Id) |> getFullPath
+                        do! File.AppendAllTextAsync(path, JsonConvert.SerializeObject zippedMessage) |> Async.AwaitTask
 
+                        zippedMessage.Id
+                        |> Remove
+                        |> postMessage
+
+                        return! loop()
+                    | Zipped.Stop -> ()
+                }
+            return! loop ()
         }) |> Agent // Agent is a constructor funtion that takes a MailboxProcessor. '|>' passes the mailboxprocessor to the constructor function

@@ -13,13 +13,14 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{C13BF34C
 		build.bat = build.bat
 		paket.dependencies = paket.dependencies
 		paket.lock = paket.lock
+		run.bat = run.bat
 	EndProjectSection
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "bottleneck", "bottleneck\bottleneck.fsproj", "{ABF94CFA-1C58-4222-BDC1-BD784D6D0868}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "dispatcher", "dispatcher\dispatcher.fsproj", "{3818E60A-9ADE-4D60-A4D4-D1263E396C51}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "runner", "runner\runner.fsproj", "{A8084BA9-31E9-44B7-B342-78CFBF9048A9}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "runner", "runner\runner.fsproj", "{A8084BA9-31E9-44B7-B342-78CFBF9048A9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
