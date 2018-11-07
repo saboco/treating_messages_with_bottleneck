@@ -9,9 +9,10 @@ let private nextMessage n : seq<RawMessage> = seq {
 }
 
 let private hasToBeTreated (message : RawMessage) =
-    let r = Random()
-    let n = r.Next(1,3)
-    message.Id % n = 0 // filter logic
+    //let r = Random()
+    //let n = r.Next(1,3)
+    //message.Id % n = 0 // filter logic
+    true
 
 let fetchMessagesAgent removeMsg getAgent n =
     async {
