@@ -24,25 +24,31 @@ let createAgent (url : System.Uri) stopZipperAgent stopStoreAgent endsApp number
                     if accumulator.Count >= numberOfMessages
                     then inbox.Post Remove.Stop
 
-                    let! msg = inbox.Receive()
-                    match msg with
-                    | Remove id when toRemove.Length = batchSize ->
-                        let toRemove = (List.Cons(id,toRemove))
-                        let! body = treatMessages toRemove
+                    let! msgO = inbox.TryReceive(5000)
+                    match msgO with
+                    | Some msg ->
+                        match msg with
+                        | Remove id when toRemove.Length = batchSize ->
+                            let toRemove = (List.Cons(id,toRemove))
+                            let! body = treatMessages toRemove
 
-                        printfn "%s" body
+                            printfn "%s" body
 
-                        return! loop (accumulator.Add id) []
-                    | Remove id ->
-                        return! loop (accumulator.Add id) (List.Cons(id,toRemove))
-                    | Remove.Stop ->
-                        if toRemove.Length > 0 then
-                            let! _ = treatMessages toRemove
-                            ()
+                            return! loop (accumulator.Add id) []
+                        | Remove id ->
+                            return! loop (accumulator.Add id) (List.Cons(id,toRemove))
+                        | Remove.Stop ->
+                            printfn "Remover is stopping..."
+                            if toRemove.Length > 0 then
+                                let! _ = treatMessages toRemove
+                                ()
 
-                        stopZipperAgent ()
-                        stopStoreAgent ()
-                        endsApp ()
+                            stopZipperAgent ()
+                            stopStoreAgent ()
+                            endsApp ()
+                    | None -> 
+                        printfn "Remover is starving..."
+                        return! loop counter toRemove
                 }
             return! loop counter []
         }) |> Agent // Agent is a constructor funtion that takes a MailboxProcessor. '|>' passes the mailboxprocessor to the constructor function

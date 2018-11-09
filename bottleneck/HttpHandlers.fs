@@ -15,8 +15,7 @@ module HttpHandlers =
                     {   message with
                             Body = sprintf "%s and some info more" message.Body }
 
-                let! messages = ctx.BindJsonAsync<Message list>()
-                do! Task.Delay(100) // adding more treatment time
+                let! messages = ctx.BindJsonAsync<Message list>()                
                 let response = List.map hydratedMessage messages
                 return! json response next ctx
             }

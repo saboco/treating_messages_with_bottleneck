@@ -1,3 +1,4 @@
+taskkill /FI "MODULES eq bottleneck.dll" /F
 rmdir /Q /S bin\
 
 dotnet publish .\bottleneck\bottleneck.fsproj -c release -o ..\bin\app\bottleneck

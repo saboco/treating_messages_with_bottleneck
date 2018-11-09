@@ -11,11 +11,11 @@ let private hasToBeTreated (message : RawMessage) =
     //message.Id % n = 0 // filter logic
     true
 
-let fetchMessagesAgent (url : Uri) removeMsg getAgent numberOfMessages batchSize numberOfAgents =
+let fetchMessagesAgent (url : Uri) removeMsg getAgent numberOfMessages batchSizeToFetchMessages batchSizeToSendMessages numberOfAgents =
     let rec fetchMessages =
         let rec loop () =
             async {
-                let url = Url.createUri url (sprintf "/batch/%i/total/%i" batchSize numberOfMessages)
+                let url = Url.createUri url (sprintf "/batch/%i/total/%i" batchSizeToFetchMessages numberOfMessages)
                 use client = new HttpClient()
                 let! res = client.GetAsync(url) |> Async.AwaitTask
                 let! body = res.Content.ReadAsStringAsync() |> Async.AwaitTask
@@ -25,8 +25,10 @@ let fetchMessagesAgent (url : Uri) removeMsg getAgent numberOfMessages batchSize
 
                 messages
                 |> List.filter hasToBeTreated
-                |> Fetched
-                |> agent.Post
+                |> List.chunkBySize batchSizeToSendMessages
+                |> List.map Fetched
+                |> List.map agent.Post
+                |> ignore
 
                 messages
                 |> List.filter (hasToBeTreated >> not)
@@ -36,7 +38,9 @@ let fetchMessagesAgent (url : Uri) removeMsg getAgent numberOfMessages batchSize
 
                 if messages.Length > 0
                 then return! loop ()
-                else return ()
+                else
+                    printfn "*********************************************************************************************** RawMessages: no more messsages to fetch"
+                    return ()
             }
         loop ()
 

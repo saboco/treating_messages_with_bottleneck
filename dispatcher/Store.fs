@@ -5,7 +5,7 @@ open System.IO
 open Models
 open Newtonsoft.Json
 
-let createAgent postMessage =
+let createAgent postMessage writeOnDisk =
     let storePath =
         let here = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
         let storeId = System.Guid.NewGuid()
@@ -20,18 +20,25 @@ let createAgent postMessage =
         async {
             let rec loop () =
                 async {
-                    let! msg = inbox.Receive()
-                    match msg with
-                    | Zipped zippedMessage ->
-                        let path = (sprintf "message%i" zippedMessage.Id) |> getFullPath
-                        do! File.AppendAllTextAsync(path, JsonConvert.SerializeObject zippedMessage) |> Async.AwaitTask
+                    let! msgO = inbox.TryReceive(5000)
+                    match msgO with
+                    | Some msg ->
+                        match msg with
+                        | Zipped zippedMessage ->
+                            
+                            if writeOnDisk then
+                                let path = (sprintf "message%i" zippedMessage.Id) |> getFullPath
+                                do! File.AppendAllTextAsync(path, JsonConvert.SerializeObject zippedMessage) |> Async.AwaitTask
 
-                        zippedMessage.Id
-                        |> Remove
-                        |> postMessage
+                            zippedMessage.Id
+                            |> Remove
+                            |> postMessage
 
-                        return! loop()
-                    | Zipped.Stop -> ()
+                            return! loop()
+                        | Zipped.Stop -> ()
+                    | None ->
+                        printfn "Store is starving...."
+                        return! loop ()
                 }
             return! loop ()
         }) |> Agent // Agent is a constructor funtion that takes a MailboxProcessor. '|>' passes the mailboxprocessor to the constructor function
